@@ -4,6 +4,7 @@ namespace Owlookit\Cloudpayments\Request;
 
 use DateTime;
 use Owlookit\Cloudpayments\BaseRequest;
+use Owlookit\Cloudpayments\Exceptions\BadTypeException;
 
 /**
  * Class SubscriptionCreate
@@ -32,4 +33,31 @@ class SubscriptionCreate extends BaseRequest
     public int $period;
     public ?int $maxPeriods;
     public ?string $customerReceipt;
+
+    /**
+     * SubscriptionCreate constructor.
+     *
+     * @param          $amount
+     * @param  string  $currency
+     * @param  string  $description
+     * @throws BadTypeException
+     */
+    public function __construct(string $token, string $accountId, string $description, string $email, $amount, string $currency, bool $requireConfirmation, DateTime $startDate, string $interval, int $period)
+    {
+        if (! is_numeric($amount)) {
+            throw new BadTypeException('Amount isn\'t numeric');
+        }
+
+        $this->token = $token;
+        $this->accountId = $accountId;
+        $this->description = $description;
+        $this->email = $email;
+        $this->amount = $amount;
+        $this->currency = $currency;
+        $this->requireConfirmation = $requireConfirmation;
+        $this->startDate = $startDate;
+        $this->interval = $interval;
+        $this->period = $period;
+
+    }
 }

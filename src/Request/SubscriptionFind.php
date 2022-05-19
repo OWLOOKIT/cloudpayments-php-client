@@ -14,4 +14,14 @@ use Owlookit\Cloudpayments\BaseRequest;
 class SubscriptionFind extends BaseRequest
 {
     public string $accountId;
+
+    /**
+     * SubscriptionFind constructor.
+     *
+     * @param  string  $accountId
+     */
+    public function __construct(string $accountId)
+    {
+        $this->accountId = $accountId;
+    }
 }
