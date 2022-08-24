@@ -31,6 +31,11 @@ class HookPay extends BaseHook
     public ?string $invoiceId = null;
     public ?string $accountId = null;
     public ?string $subscriptionId = null;
+    public ?float $paymentAmount = null;
+    public ?string $paymentCurrency = null;
+    public ?string $ipLatitude = null;
+    public ?string $ipLongitude = null;
+    public ?string $authCode = null;
     public ?string $name = null;
     public ?string $email = null;
     public ?string $ipAddress = null;
