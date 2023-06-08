@@ -6,9 +6,8 @@ use Owlookit\Cloudpayments\BaseRequest;
 
 /**
  * Class PaymentsList
- *
  * @package Owlookit\Cloudpayments\CardPayment
- * @see     https://developers.cloudpayments.ru/#vygruzka-spiska-tranzaktsiy
+ * @see https://developers.cloudpayments.ru/#vygruzka-spiska-tranzaktsiy
  */
 class PaymentsList extends BaseRequest
 {
