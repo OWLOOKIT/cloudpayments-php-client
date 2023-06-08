@@ -18,6 +18,7 @@
         "myclabs/php-enum": "^1.8"
     },
     "require-dev": {
+        "roave/security-advisories": "dev-latest",
         "phpunit/phpunit": "9.5.23"
     },
     "autoload": {
