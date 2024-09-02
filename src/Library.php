@@ -19,6 +19,7 @@ use Owlookit\Cloudpayments\Request\PaymentsListV2;
 use Owlookit\Cloudpayments\Request\PaymentsRefund;
 use Owlookit\Cloudpayments\Request\PaymentsVoid;
 use Owlookit\Cloudpayments\Request\Post3DS;
+use Owlookit\Cloudpayments\Request\Receipt\CorrectionReceiptData;
 use Owlookit\Cloudpayments\Request\SubscriptionCancel;
 use Owlookit\Cloudpayments\Request\SubscriptionCreate;
 use Owlookit\Cloudpayments\Request\SubscriptionFind;
@@ -40,6 +41,7 @@ use Owlookit\Cloudpayments\Response\TransactionResponse;
 use Owlookit\Cloudpayments\Response\TransactionWith3dsResponse;
 use GuzzleHttp\Client;
 use Psr\Http\Message\ResponseInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * Библиотека методов для работы с CloudPayments
@@ -47,7 +49,7 @@ use Psr\Http\Message\ResponseInterface;
  */
 class Library
 {
-    const DEFAULT_URL = 'https://api.cloudpayments.ru/';
+    const DEFAULT_URL = 'https://api.tiptoppay.kz/';
 
     protected string  $publicId;
     protected string  $pass;
@@ -56,15 +58,25 @@ class Library
     protected bool    $idempotency    = false;
     protected ?string $idempotencyKey = null;
 
+    protected $logger;
+
     /**
      * Library constructor.
      * @param string $publicId
      * @param string $pass
      * @param string|null $cpUrlApi
      * @param array|null $options
+     * @param Client|null $client
+     * @param LoggerInterface|null $logger
      */
-    public function __construct(string $publicId, string  $pass, ?string $cpUrlApi = null, ?array $options = null)
-    {
+    public function __construct(
+        string $publicId,
+        string $pass,
+        ?string $cpUrlApi = null,
+        ?array $options = null,
+        Client $client = null,
+        LoggerInterface $logger = null
+    ) {
         $this->url      = $cpUrlApi === null ? self::DEFAULT_URL : $cpUrlApi;
         $this->publicId = $publicId;
         $this->pass     = $pass;
@@ -80,7 +92,8 @@ class Library
             $data = array_merge($options, $data);
         }
 
-        $this->client = new Client($data);
+        $this->client = $client ?? new Client($data);
+        $this->logger = $logger;
     }
 
     /**
@@ -440,32 +453,60 @@ class Library
 
     /**
      * Базовый запрос
-     * @param string $method
-     * @param array $postData
+     * @param string $method API endpoint
+     * @param array $postData Передаваемые данные
      * @param CloudResponse|null $cloudResponse
+     * @param bool $asJson Отправка как JSON
      * @return mixed
      */
-    protected function request(string $method, array $postData = [], ?CloudResponse $cloudResponse = null): CloudResponse
-    {
-        $response = $this->sendRequest($method, $postData);
+    protected function request(
+        string $method,
+        array $postData = [],
+        ?CloudResponse $cloudResponse = null,
+        bool $asJson = false
+    ): CloudResponse {
+        $response = $this->sendRequest($method, $postData, $asJson);
+        if ($this->logger) {
+            $context = [
+                'method'   => $method,
+                'postData' => $postData,
+                'asJson'   => $asJson ? 'yes' : 'no',
+                'trace'    => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 20)
+            ];
+            $msg     = $response->getBody()->getContents();
+            if ($response->getStatusCode() !== 200) {
+                $this->logger->error($msg, $context);
+            } else {
+                $this->logger->debug($msg, $context);
+            }
+        }
 
         $cloudResponse = $cloudResponse ?? new CloudResponse();
+
         return $cloudResponse->fillByResponse($response);
     }
 
     /**
      * Запрос по api
-     * @param string $method
-     * @param array $postData
+     * @param string $method HTTP method (get, post, etc)
+     * @param array $postData send data
+     * @param bool $asJson send with JSON body
      * @return ResponseInterface
      */
-    public function sendRequest(string $method, array $postData = []): ResponseInterface
+    public function sendRequest(string $method, array $postData = [], bool $asJson = false): ResponseInterface
     {
-        $options = ['form_params' => $postData];
-
         if ($this->idempotency) {
-            $options['headers'] = ['X-Request-ID' => $this->idempotencyKey ?? $this->getRequestId($method, $postData)];
+            $options['headers']['X-Request-ID'] = $this->idempotencyKey ?? $this->getRequestId($method, $postData);
         }
+
+        if ($asJson) {
+            $options['headers']['Content-Type'] = 'application/json';
+            $options['json']                    = $postData;
+        } else {
+            $options['headers']['Content-Type'] = 'application/x-www-form-urlencoded';
+            $options['form_params']             = $postData;
+        }
+
 
         return $this->client->post('/' . $method, $options);
     }
@@ -484,5 +525,41 @@ class Library
         }
 
         return md5($stringData);
+    }
+
+    /**
+     * Запрос статуса чека
+     * @param string $receiptId
+     * @return CloudResponse
+     */
+    public function getReceiptStatus(string $receiptId): CloudResponse
+    {
+        $method = CloudMethodsEnum::KKT_RECEIPT . '/status/get';
+
+        return $this->request($method, ['Id' => $receiptId]);
+    }
+
+    /**
+     * Формирование чека коррекции
+     * @param CorrectionReceiptData $data
+     * @return CloudResponse|mixed
+     */
+    public function createCorrectionReceipt(CorrectionReceiptData $data)
+    {
+        $method = CloudMethodsEnum::CORRECTION_RECEIPT;
+
+        return $this->request($method, ['CorrectionReceiptData' => $data->asArray()], null, true);
+    }
+
+    /**
+     * Получение данных о чеке коррекции
+     * @param string $receiptId ID-чека
+     * @return CloudResponse
+     */
+    public function getCorrectionReceiptInfo(string $receiptId): CloudResponse
+    {
+        $method = CloudMethodsEnum::CORRECTION_RECEIPT . '/get';
+
+        return $this->request($method, ['Id' => $receiptId], null, true);
     }
 }
